@@ -1,0 +1,9 @@
+google-cloud-bigquery
+fastapi
+pydantic
+uvicorn
+pandas
+pyarrow
+pytest
+httpx
+python-dotenv

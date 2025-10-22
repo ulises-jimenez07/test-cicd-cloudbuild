@@ -1,0 +1,50 @@
+substitutions:
+  # These values are provided by the Cloud Build trigger configuration
+  # Set these in your trigger to keep sensitive values out of the repository
+  _GCP_REGION: ''
+  _ARTIFACT_REGISTRY_REPO: ''
+  _IMAGE_NAME: ''
+  _CLOUD_RUN_SERVICE_NAME: ''
+  _PORT: ''
+  # Runtime environment variables for the application
+  _GCP_PROJECT_ID: ''
+  _BQ_DATASET: ''
+  _BQ_TABLE_NAME: ''
+  _GCS_BUCKET_NAME: ''
+  _GCS_CSV_FILE_PATH: ''
+
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/${_IMAGE_NAME}:$COMMIT_SHA', '.']
+
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/${_IMAGE_NAME}:$COMMIT_SHA']
+
+- name: '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/${_IMAGE_NAME}:$COMMIT_SHA'
+  entrypoint: 'bash'
+  args:
+   - '-c'
+   - |
+      python -m pytest
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+   - 'run'
+   - 'deploy'
+   - '${_CLOUD_RUN_SERVICE_NAME}'
+   - '--image'
+   - '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/${_IMAGE_NAME}:$COMMIT_SHA'
+   - '--region'
+   - '${_GCP_REGION}'
+   - '--allow-unauthenticated'
+   - '--port'
+   - '${_PORT}'
+   - '--set-env-vars'
+   - 'GCP_PROJECT_ID=${_GCP_PROJECT_ID},BQ_DATASET=${_BQ_DATASET},BQ_TABLE_NAME=${_BQ_TABLE_NAME},GCS_BUCKET_NAME=${_GCS_BUCKET_NAME},GCS_CSV_FILE_PATH=${_GCS_CSV_FILE_PATH},PORT=${_PORT}'
+
+images:
+- '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REGISTRY_REPO}/${_IMAGE_NAME}:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
