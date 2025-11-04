@@ -39,13 +39,44 @@ This application:
 
 ## Setup Instructions
 
+### 0. Fork and Set Up Your Repository
+
+This repository is a public example. To use it for your own CI/CD pipeline, you'll need to create your own repository:
+
+```bash
+# Clone the example repository
+git clone https://github.com/ulises-jimenez07/test-cicd-cloudbuild.git
+cd test-cicd-cloudbuild
+
+# Remove the existing .git directory
+rm -rf .git
+
+# Initialize a new git repository
+git init
+
+# Create a new repository on GitHub (do this via GitHub web interface first)
+# Then add your new repository as the remote origin
+git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPO-NAME.git
+
+# Add all files to the new repository
+git add .
+
+# Create initial commit
+git commit -m "Initial commit from template"
+
+# Push to your new repository
+git push -u origin main
+```
+
+**Important:** Make sure to create a new repository on GitHub before running the remote add command. You can create a new repo at [https://github.com/new](https://github.com/new).
+
 ### 1. Initial Setup
 
 Set up environment variables for your project (customize these values):
 
 ```bash
 # Set your project configuration
-export PROJECT_ID="your-project-id"
+export PROJECT_ID=$(gcloud config get-value project)
 export REGION="us-central1"
 export ARTIFACT_REPO="app-repo"
 export IMAGE_NAME="demo-flask-app"
@@ -54,9 +85,6 @@ export BQ_DATASET="test_schema"
 export BQ_TABLE="us_states"
 export BUCKET_NAME="${PROJECT_ID}-data-bucket"
 export CSV_FILE="us-states.csv"
-
-# Set your active project
-gcloud config set project $PROJECT_ID
 ```
 
 ### 2. Create GCP Infrastructure
@@ -138,23 +166,9 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
   --role="roles/bigquery.admin"
 ```
 
-### 3. Download Sample Data
+### 3. Create Sample Data
 
-Download the US states CSV file and upload to Cloud Storage.
-
-#### Option 1: Download from GitHub (Recommended)
-
-```bash
-# Download US states data (state names and abbreviations)
-curl -o us-states.csv https://raw.githubusercontent.com/jasonong/List-of-US-States/master/states.csv
-
-# Or download with state areas
-curl -o us-states.csv https://raw.githubusercontent.com/jakevdp/data-USstates/master/state-areas.csv
-```
-
-#### Option 2: Create Your Own CSV File
-
-If the above links don't work, create a simple `us-states.csv` file:
+Create US states CSV file and upload to Cloud Storage.
 
 ```bash
 cat > us-states.csv << 'EOF'
@@ -222,15 +236,6 @@ gcloud storage cp us-states.csv gs://$BUCKET_NAME/
 # Verify upload
 gcloud storage ls gs://$BUCKET_NAME/
 ```
-
-**Using Google Cloud Console:**
-1. Go to [Cloud Storage](https://console.cloud.google.com/storage/browser)
-2. Click on your bucket name
-3. Click **"Upload files"** button
-4. Select your `us-states.csv` file
-5. Verify the file appears in the bucket
-
-**Note:** If you use a different CSV structure, ensure your BigQuery table schema matches your CSV columns.
 
 ### 4. Configure Cloud Build Trigger
 
