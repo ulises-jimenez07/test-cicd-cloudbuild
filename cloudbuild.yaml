@@ -38,8 +38,7 @@ steps:
    - '--region'
    - '${_GCP_REGION}'
    - '--allow-unauthenticated'
-   - '--port'
-   - '${_PORT}'
+   - '--port 8000'
    - '--set-env-vars'
    - 'GCP_PROJECT_ID=${_GCP_PROJECT_ID},BQ_DATASET=${_BQ_DATASET},BQ_TABLE_NAME=${_BQ_TABLE_NAME},GCS_BUCKET_NAME=${_GCS_BUCKET_NAME},GCS_CSV_FILE_PATH=${_GCS_CSV_FILE_PATH},PORT=${_PORT}'
 
