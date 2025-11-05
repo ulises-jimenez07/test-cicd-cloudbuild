@@ -1,16 +1,18 @@
-# Flask App CI/CD with Cloud Build
+# FastAPI App CI/CD with Cloud Build
 
-This project demonstrates a complete CI/CD pipeline for a Flask application using Google Cloud Build, Cloud Run, BigQuery, and Cloud Storage.
+This project demonstrates a complete CI/CD pipeline for a FastAPI application using Google Cloud Build, Cloud Run, BigQuery, and Cloud Storage.
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
 - [Architecture](#architecture)
 - [Setup Instructions](#setup-instructions)
-  - [1. Initial Setup](#1-initial-setup)
-  - [2. Create GCP Infrastructure](#2-create-gcp-infrastructure)
-  - [3. Download Sample Data](#3-download-sample-data)
-  - [4. Configure Cloud Build Trigger](#4-configure-cloud-build-trigger)
+  - [0. Configure GitHub Credentials](#0-configure-github-credentials)
+  - [1. Fork and Set Up Your Repository](#1-fork-and-set-up-your-repository)
+  - [2. Initial Setup](#2-initial-setup)
+  - [3. Create GCP Infrastructure](#3-create-gcp-infrastructure)
+  - [4. Create Sample Data](#4-create-sample-data)
+  - [5. Configure Cloud Build Trigger](#5-configure-cloud-build-trigger)
 - [Environment Variables](#environment-variables)
 - [Deployment](#deployment)
 - [Troubleshooting](#troubleshooting)
@@ -39,7 +41,78 @@ This application:
 
 ## Setup Instructions
 
-### 0. Fork and Set Up Your Repository
+### 0. Configure GitHub Credentials
+
+Before you begin, ensure you have GitHub credentials configured to push to your remote repository. Choose one of the following methods:
+
+#### Option 1: SSH (Recommended)
+
+1. Check if you already have an SSH key:
+   ```bash
+   ls -al ~/.ssh
+   # Look for files like id_rsa.pub, id_ed25519.pub, or id_ecdsa.pub
+   ```
+
+2. If you don't have an SSH key, generate one:
+   ```bash
+   ssh-keygen -t ed25519 -C "your_email@example.com"
+   # Press Enter to accept the default file location
+   # Optionally, enter a passphrase for added security
+   ```
+
+3. Add your SSH key to the ssh-agent:
+   ```bash
+   eval "$(ssh-agent -s)"
+   ssh-add ~/.ssh/id_ed25519
+   ```
+
+4. Copy your public SSH key:
+   ```bash
+   cat ~/.ssh/id_ed25519.pub
+   # Copy the entire output
+   ```
+
+5. Add the SSH key to your GitHub account:
+   - Go to [GitHub SSH Settings](https://github.com/settings/keys)
+   - Click **"New SSH key"**
+   - Paste your public key and give it a descriptive title
+   - Click **"Add SSH key"**
+
+6. Test your connection:
+   ```bash
+   ssh -T git@github.com
+   # You should see: "Hi username! You've successfully authenticated..."
+   ```
+
+#### Option 2: HTTPS with Personal Access Token (PAT)
+
+1. Create a Personal Access Token:
+   - Go to [GitHub Token Settings](https://github.com/settings/tokens)
+   - Click **"Generate new token"** → **"Generate new token (classic)"**
+   - Give it a descriptive name (e.g., "CI/CD Project")
+   - Select scopes: `repo` (full control of private repositories)
+   - Click **"Generate token"**
+   - **Important:** Copy the token immediately - you won't see it again!
+
+2. Configure Git to use the token:
+   ```bash
+   # Store credentials (macOS)
+   git config --global credential.helper osxkeychain
+
+   # Store credentials (Linux)
+   git config --global credential.helper store
+
+   # Store credentials (Windows)
+   git config --global credential.helper wincred
+   ```
+
+3. When you push for the first time, use:
+   ```bash
+   # Use your token as the password when prompted
+   git push origin main
+   ```
+
+### 1. Fork and Set Up Your Repository
 
 This repository is a public example. To use it for your own CI/CD pipeline, you'll need to create your own repository:
 
@@ -69,7 +142,7 @@ git push -u origin main
 
 **Important:** Make sure to create a new repository on GitHub before running the remote add command. You can create a new repo at [https://github.com/new](https://github.com/new).
 
-### 1. Initial Setup
+### 2. Initial Setup
 
 Set up environment variables for your project (customize these values):
 
@@ -78,7 +151,7 @@ Set up environment variables for your project (customize these values):
 export PROJECT_ID=$(gcloud config get-value project)
 export REGION="us-central1"
 export ARTIFACT_REPO="app-repo"
-export IMAGE_NAME="demo-flask-app"
+export IMAGE_NAME="demo-fastapi-app"
 export SERVICE_NAME="py-bq-load"
 export BQ_DATASET="test_schema"
 export BQ_TABLE="us_states"
@@ -86,7 +159,7 @@ export BUCKET_NAME="${PROJECT_ID}-data-bucket"
 export CSV_FILE="us-states.csv"
 ```
 
-### 2. Create GCP Infrastructure
+### 3. Create GCP Infrastructure
 
 #### Enable Required APIs
 
@@ -108,7 +181,7 @@ gcloud services enable \
 gcloud artifacts repositories create $ARTIFACT_REPO \
   --repository-format=docker \
   --location=$REGION \
-  --description="Docker repository for Flask app"
+  --description="Docker repository for FastAPI app"
 
 # Verify creation
 gcloud artifacts repositories list --location=$REGION
@@ -165,7 +238,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
   --role="roles/bigquery.admin"
 ```
 
-### 3. Create Sample Data
+### 4. Create Sample Data
 
 Create US states CSV file and upload to Cloud Storage.
 
@@ -236,7 +309,7 @@ gcloud storage cp us-states.csv gs://$BUCKET_NAME/
 gcloud storage ls gs://$BUCKET_NAME/
 ```
 
-### 4. Configure Cloud Build Trigger
+### 5. Configure Cloud Build Trigger
 
 Follow these steps to create a Cloud Build trigger using the Google Cloud Console:
 
@@ -255,7 +328,7 @@ Follow these steps to create a Cloud Build trigger using the Google Cloud Consol
 Fill in the following fields:
 
 - **Name**: `py-bq-load-trigger` (or any descriptive name)
-- **Description** (optional): `Build and deploy Flask app on push to main`
+- **Description** (optional): `Build and deploy FastAPI app on push to main`
 - **Event**: Select **"Push to a branch"**
 - **Region**: Select your preferred region (e.g., `us-central1`)
 
@@ -289,9 +362,9 @@ This is the **most important step** to keep sensitive values out of your reposit
 |---------------|-------|-------------|
 | `_GCP_REGION` | `us-central1` | Region for your resources (change if needed) |
 | `_ARTIFACT_REGISTRY_REPO` | `app-repo` | Name you used when creating Artifact Registry |
-| `_IMAGE_NAME` | `demo-flask-app` | Name for your Docker image |
+| `_IMAGE_NAME` | `demo-fastapi-app` | Name for your Docker image |
 | `_CLOUD_RUN_SERVICE_NAME` | `py-bq-load` | Name for your Cloud Run service |
-| `_PORT` | `8000` | Port your Flask app runs on |
+| `_PORT` | `8000` | Port your FastAPI app runs on |
 | `_GCP_PROJECT_ID` | `your-project-id` | Your actual GCP project ID |
 | `_BQ_DATASET` | `test_schema` | BigQuery dataset name you created |
 | `_BQ_TABLE_NAME` | `us_states` | BigQuery table name you created |
@@ -330,7 +403,7 @@ The following substitution variables are used in `cloudbuild.yaml`:
 |----------|-------------|---------|
 | `_GCP_REGION` | GCP region for resources | `us-central1` |
 | `_ARTIFACT_REGISTRY_REPO` | Artifact Registry repository | `app-repo` |
-| `_IMAGE_NAME` | Docker image name | `demo-flask-app` |
+| `_IMAGE_NAME` | Docker image name | `demo-fastapi-app` |
 | `_CLOUD_RUN_SERVICE_NAME` | Cloud Run service name | `py-bq-load` |
 | `_PORT` | Application port | `8000` |
 | `_GCP_PROJECT_ID` | GCP project ID | `your-project-id` |
