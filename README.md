@@ -10,9 +10,10 @@ This project demonstrates a complete CI/CD pipeline for a FastAPI application us
   - [0. Configure GitHub Credentials](#0-configure-github-credentials)
   - [1. Fork and Set Up Your Repository](#1-fork-and-set-up-your-repository)
   - [2. Initial Setup](#2-initial-setup)
-  - [3. Create GCP Infrastructure](#3-create-gcp-infrastructure)
-  - [4. Create Sample Data](#4-create-sample-data)
-  - [5. Configure Cloud Build Trigger](#5-configure-cloud-build-trigger)
+  - [3. Local Development Setup](#3-local-development-setup)
+  - [4. Create GCP Infrastructure](#4-create-gcp-infrastructure)
+  - [5. Create Sample Data](#5-create-sample-data)
+  - [6. Configure Cloud Build Trigger](#6-configure-cloud-build-trigger)
 - [Environment Variables](#environment-variables)
 - [Deployment](#deployment)
 - [Troubleshooting](#troubleshooting)
@@ -30,7 +31,8 @@ This application:
 1. Builds a Docker image and pushes to Artifact Registry
 2. Runs pytest tests
 3. Deploys to Cloud Run
-4. Loads data from Cloud Storage to BigQuery
+
+The deployed application exposes a `GET /` endpoint that loads data from Cloud Storage into BigQuery at runtime.
 
 **Services Used:**
 - **Cloud Build**: CI/CD pipeline
@@ -159,7 +161,29 @@ export BUCKET_NAME="${PROJECT_ID}-data-bucket"
 export CSV_FILE="us-states.csv"
 ```
 
-### 3. Create GCP Infrastructure
+### 3. Local Development Setup
+
+Before deploying, set up your local environment to run and test the application:
+
+```bash
+# Copy the example environment file and fill in your values
+cp .env.example .env
+# Edit .env with your actual GCP project ID, dataset, bucket, etc.
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run tests
+python -m pytest
+
+# Run the application locally
+uvicorn main:app --reload --port 8000
+# Visit http://localhost:8000 to trigger the BigQuery load
+```
+
+> **Note:** The app requires valid GCP credentials locally. Make sure you are authenticated with `gcloud auth application-default login`.
+
+### 4. Create GCP Infrastructure
 
 #### Enable Required APIs
 
@@ -170,8 +194,7 @@ gcloud services enable \
   run.googleapis.com \
   artifactregistry.googleapis.com \
   bigquery.googleapis.com \
-  storage.googleapis.com \
-  secretmanager.googleapis.com
+  storage.googleapis.com
 ```
 
 #### Create Artifact Registry Repository
@@ -236,9 +259,13 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="serviceAccount:${CLOUD_BUILD_SA}" \
   --role="roles/bigquery.admin"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${CLOUD_BUILD_SA}" \
+  --role="roles/artifactregistry.writer"
 ```
 
-### 4. Create Sample Data
+### 5. Create Sample Data
 
 Create US states CSV file and upload to Cloud Storage.
 
@@ -309,7 +336,7 @@ gcloud storage cp us-states.csv gs://$BUCKET_NAME/
 gcloud storage ls gs://$BUCKET_NAME/
 ```
 
-### 5. Configure Cloud Build Trigger
+### 6. Configure Cloud Build Trigger
 
 Follow these steps to create a Cloud Build trigger using the Google Cloud Console:
 
@@ -349,7 +376,7 @@ After connecting your repository:
   - Use `^develop$` for development branch
   - Use `.*` to trigger on any branch
 - **Configuration**: Select **"Cloud Build configuration file (yaml or json)"**
-- **Cloud Build configuration file location**: Enter `/cloudbuild.yaml`
+- **Cloud Build configuration file location**: Enter `cloudbuild.yaml` (no leading slash — path is relative to the repository root)
 
 #### Step 6: Add Substitution Variables
 
@@ -499,7 +526,7 @@ This approach allows you to safely test changes in development and staging befor
 
 ### Build Fails with Permission Errors
 
-**Issue:** Cloud Build doesn't have permissions to deploy to Cloud Run or access BigQuery.
+**Issue:** Cloud Build doesn't have permissions to push to Artifact Registry, deploy to Cloud Run, or access BigQuery.
 
 **Solution:** Grant necessary IAM roles to the Cloud Build service account:
 
@@ -507,6 +534,7 @@ This approach allows you to safely test changes in development and staging befor
 2. Find the Cloud Build service account (looks like `[PROJECT_NUMBER]@cloudbuild.gserviceaccount.com`)
 3. Click the **pencil icon** to edit permissions
 4. Click **"Add Another Role"** and add these roles:
+   - `Artifact Registry Writer`
    - `Cloud Run Admin`
    - `Service Account User`
    - `Storage Admin`
@@ -514,6 +542,14 @@ This approach allows you to safely test changes in development and staging befor
 5. Click **"Save"**
 
 Alternatively, you can run the setup commands from the [Grant Cloud Build Permissions](#grant-cloud-build-permissions) section.
+
+### Deploy Fails with `--allow-unauthenticated` Error
+
+**Issue:** Cloud Run deployment fails with a message about organization policy preventing unauthenticated access.
+
+**Context:** This project uses `--allow-unauthenticated` intentionally for testing/PoC purposes. Some GCP organizations have an org policy (`constraints/iam.allowedPolicyMemberDomains` or `constraints/run.allowedIngress`) that blocks this.
+
+**Solution:** Ask your GCP organization admin to grant an exception for your project, or test in a personal GCP project without org policies.
 
 ### Substitution Variables Are Empty
 
